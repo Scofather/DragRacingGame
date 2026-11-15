@@ -29,22 +29,21 @@ public class RaceTimer : MonoBehaviour
         {
             raceTime += Time.deltaTime;
             if (timerText != null)
-                timerText.text = "Time: " + raceTime.ToString("F2") + "s";
+                timerText.text = string.Format("Time: {0:F2}s", raceTime);
         }
     }
 
     private void OnTriggerEnter(Collider other)
     {
         if (isFinished) return;
-        if (other.gameObject.name == "Player Car")
+        if (other.GetComponent<CarPhysics>() == null) return;
+
+        isRacing = false;
+        isFinished = true;
+        if (timerText != null)
         {
-            isRacing = false;
-            isFinished = true;
-            if (timerText != null)
-            {
-                timerText.text = "Time: " + raceTime.ToString("F2") + "s";
-                timerText.color = Color.green;
-            }
+            timerText.text = string.Format("Time: {0:F2}s", raceTime);
+            timerText.color = Color.green;
         }
     }
 }

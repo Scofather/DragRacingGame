@@ -7,10 +7,12 @@ public class WeatherSystem : MonoBehaviour
     public WeatherType currentWeather = WeatherType.Sunny;
     public CarPhysics car;
 
+    private WeatherType appliedWeather = (WeatherType)(-1);
+
     private void Update()
     {
-        if (car == null) return;
-
+        if (car == null || currentWeather == appliedWeather) return;
+        appliedWeather = currentWeather;
         switch (currentWeather)
         {
             case WeatherType.Sunny: car.frictionCoefficient = 1.0f; break;

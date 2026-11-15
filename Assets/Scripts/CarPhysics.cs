@@ -28,23 +28,34 @@ public class CarPhysics : MonoBehaviour
     public ParticleSystem[] tireSmokeParticles;
 
     private const float WheelRadius = 0.3f;
+    private Rigidbody rb;
+
+    private void Awake()
+    {
+        rb = GetComponent<Rigidbody>();
+        if (rb != null) rb.isKinematic = true;
+    }
 
     public void ApplyThrottle(float input)
     {
         isAccelerating = input > 0f;
 
-        float engineForce = ((maxTorque * input * frictionCoefficient) * gearRatios[currentGear - 1]) / WheelRadius;
+        float ratio = Mathf.Max(gearRatios[currentGear - 1], 0.01f);
+        float engineForce = ((maxTorque * input * frictionCoefficient) * ratio) / WheelRadius;
         float dragForce = dragCoefficient * (velocity * velocity);
 
         velocity += ((engineForce - dragForce) / mass) * Time.deltaTime;
         velocity = Mathf.Clamp(velocity, 0f, maxVelocity);
 
-        currentRPM = velocity * gearRatios[currentGear - 1] * 100f;
+        currentRPM = velocity * ratio * 100f;
 
         if (!isManual && currentRPM > maxRPM && currentGear < gearRatios.Length)
             currentGear++;
 
-        transform.position += transform.forward * velocity * Time.deltaTime;
+        Vector3 newPos = transform.position + transform.forward * velocity * Time.deltaTime;
+        if (rb != null) rb.MovePosition(newPos);
+        else            transform.position = newPos;
+
         UpdateEffects();
     }
 

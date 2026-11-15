@@ -8,8 +8,7 @@ public class BrakeSystem : MonoBehaviour
 
     public bool IsBraking => isBraking;
 
-    private bool     isBraking;
-    private Material brakeLightMat;
+    private bool isBraking;
 
     private static readonly Color LightOff = new Color(0.25f, 0f,    0f, 1f);
     private static readonly Color LightOn  = new Color(1f,    0.05f, 0f, 1f);

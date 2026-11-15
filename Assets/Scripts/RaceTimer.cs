@@ -22,10 +22,6 @@ public class RaceTimer : MonoBehaviour
     {
         if (isFinished) return;
 
-        bool inputDetected = Input.GetMouseButton(0) || Input.GetAxis("Vertical") > 0f;
-        if (!isRacing && inputDetected)
-            isRacing = true;
-
         if (isRacing)
         {
             raceTime += Time.deltaTime;

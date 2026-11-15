@@ -10,22 +10,44 @@ public class AIOpponent : MonoBehaviour
     public float speedBias      = 0.97f;  // <1 = easier, >1 = harder
     public float randomVariance = 0.05f;  // random speed nudge each race
 
+    [Header("Finish")]
+    public float finishZ          = 402.33f;
+    public float stopDeceleration = 40f;
+
+    public bool  HasFinished => hasFinished;
+    public float FinishTime  => finishTime;
+
     private bool  raceStarted;
     private bool  accelerating;
+    private bool  hasFinished;
     private float reactionTimer;
+    private float elapsed;
+    private float finishTime;
 
-    private void Awake()
-    {
-        reactionDelay = Mathf.Max(0f, reactionDelay + Random.Range(-0.12f, 0.12f));
-    }
+    private bool  baseCaptured;
+    private float baseMaxVelocity;
+    private float baseMaxTorque;
 
     private void Start()
     {
+        if (!baseCaptured) Configure(speedBias, reactionDelay);
+    }
+
+    public void Configure(float bias, float reaction)
+    {
         if (car == null) return;
-        float bias = speedBias + Random.Range(-randomVariance, randomVariance);
-        bias = Mathf.Clamp(bias, 0.7f, 1.2f);
-        car.maxVelocity *= bias;
-        car.maxTorque   *= bias;
+        if (!baseCaptured)
+        {
+            baseCaptured    = true;
+            baseMaxVelocity = car.maxVelocity;
+            baseMaxTorque   = car.maxTorque;
+        }
+
+        speedBias = bias;
+        float b = Mathf.Clamp(bias + Random.Range(-randomVariance, randomVariance), 0.7f, 1.2f);
+        car.maxVelocity = baseMaxVelocity * b;
+        car.maxTorque   = baseMaxTorque   * b;
+        reactionDelay   = Mathf.Max(0f, reaction + Random.Range(-0.12f, 0.12f));
     }
 
     private void Update()
@@ -38,9 +60,20 @@ public class AIOpponent : MonoBehaviour
             {
                 raceStarted   = true;
                 reactionTimer = reactionDelay;
+                elapsed       = raceTimer.FinalTime;
             }
             return;
         }
+
+        if (hasFinished)
+        {
+            car.ApplyThrottle(0f);
+            car.velocity = Mathf.Max(0f, car.velocity - stopDeceleration * Time.deltaTime);
+            return;
+        }
+
+        // Own clock: the race timer stops when the player finishes, the rival may still be running.
+        elapsed += Time.deltaTime;
 
         if (!accelerating)
         {
@@ -48,7 +81,12 @@ public class AIOpponent : MonoBehaviour
             if (reactionTimer <= 0f) accelerating = true;
         }
 
-        if (accelerating && !raceTimer.IsFinished)
-            car.ApplyThrottle(1f);
+        if (accelerating) car.ApplyThrottle(1f);
+
+        if (transform.position.z >= finishZ)
+        {
+            hasFinished = true;
+            finishTime  = elapsed;
+        }
     }
 }

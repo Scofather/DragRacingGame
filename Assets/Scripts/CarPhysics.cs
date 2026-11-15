@@ -28,11 +28,10 @@ public class CarPhysics : MonoBehaviour
     public ParticleSystem[] tireSmokeParticles;
 
     private const float WheelRadius = 0.3f;
-    private Rigidbody rb;
 
     private void Awake()
     {
-        rb = GetComponent<Rigidbody>();
+        var rb = GetComponent<Rigidbody>();
         if (rb != null) rb.isKinematic = true;
     }
 
@@ -52,9 +51,8 @@ public class CarPhysics : MonoBehaviour
         if (!isManual && currentRPM > maxRPM && currentGear < gearRatios.Length)
             currentGear++;
 
-        Vector3 newPos = transform.position + transform.forward * velocity * Time.deltaTime;
-        if (rb != null) rb.MovePosition(newPos);
-        else            transform.position = newPos;
+        // Not Rigidbody.MovePosition: that only applies on physics steps, so per-frame moves get dropped.
+        transform.position += transform.forward * velocity * Time.deltaTime;
 
         UpdateEffects();
     }

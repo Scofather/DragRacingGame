@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using UnityEditor;
+using UnityEditor.Events;
 using UnityEditor.SceneManagement;
 
 public class MasterAutomator
@@ -34,8 +35,18 @@ public class MasterAutomator
             return m;
         }
 
+        // Particle systems added from script have no material and render magenta without one
+        Shader particleShader = Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? Shader.Find("Particles/Standard Unlit");
+        var particleMat = new Material(particleShader);
+        particleMat.SetFloat("_Surface", 1f);
+        particleMat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        particleMat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        particleMat.SetFloat("_ZWrite", 0f);
+        particleMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        particleMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+
         // ── Lighting ────────────────────────────────────────────────────────
-        var existingLights = Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+        var existingLights = Object.FindObjectsByType<Light>();
         foreach (var l in existingLights)
             if (l.type == LightType.Directional) Object.DestroyImmediate(l.gameObject);
 
@@ -309,9 +320,15 @@ public class MasterAutomator
             grad.SetKeys(new[] { new GradientColorKey(Color.gray, 0f), new GradientColorKey(Color.white, 1f) },
                          new[] { new GradientAlphaKey(0.8f, 0f), new GradientAlphaKey(0f, 1f) });
             col.color = new ParticleSystem.MinMaxGradient(grad);
+            smokeGO.GetComponent<ParticleSystemRenderer>().material = particleMat;
             smokeSystems[i] = ps;
         }
         carPhysics.tireSmokeParticles = smokeSystems;
+
+        var playerAudio = playerCar.AddComponent<AudioSource>();
+        playerAudio.playOnAwake  = false;
+        playerAudio.spatialBlend = 0f;
+        playerCar.AddComponent<EngineAudio>().car = carPhysics;
 
         var nitroBoost = playerCar.AddComponent<NitroBoost>();
         nitroBoost.car = carPhysics;
@@ -350,6 +367,18 @@ public class MasterAutomator
         aiRb.useGravity  = false;
 
         var aiPhysics = aiCar.AddComponent<CarPhysics>();
+
+        var aiAudio = aiCar.AddComponent<AudioSource>();
+        aiAudio.playOnAwake  = false;
+        aiAudio.spatialBlend = 1f;
+        aiAudio.dopplerLevel = 0f;
+        aiAudio.rolloffMode  = AudioRolloffMode.Linear;
+        aiAudio.minDistance  = 4f;
+        aiAudio.maxDistance  = 60f;
+        var aiEngine = aiCar.AddComponent<EngineAudio>();
+        aiEngine.car            = aiPhysics;
+        aiEngine.idleVolume     = 0.12f;
+        aiEngine.throttleVolume = 0.4f;
 
         var aiBodyMat = Mat(new Color(0.05f, 0.15f, 0.92f), 0.25f, 0.75f);
 
@@ -401,6 +430,51 @@ public class MasterAutomator
         camGO.transform.SetParent(playerCar.transform, false);
         camGO.transform.localPosition    = new Vector3(0f, 1.1f, -5.5f);
         camGO.transform.localEulerAngles = new Vector3(9f, 0f, 0f);
+        if (Object.FindObjectsByType<AudioListener>().Length == 0)
+            camGO.AddComponent<AudioListener>();
+
+        // Rain and snow follow the player; particles fall in world space
+        ParticleSystem MakePrecipitation(string name, float fallSpeed, float lifetime, float size, float rate,
+                                         Vector3 boxCentre, Vector3 boxSize, Color color, bool streaks)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(playerCar.transform, false);
+            go.transform.localPosition = boxCentre;
+            var ps   = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.playOnAwake     = false;
+            main.loop            = true;
+            main.startLifetime   = lifetime;
+            main.startSpeed      = 0f;
+            main.startSize       = size;
+            main.startColor      = color;
+            main.maxParticles    = 8000;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            var em = ps.emission; em.rateOverTime = rate;
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.scale     = boxSize;
+            var vel = ps.velocityOverLifetime;
+            vel.enabled = true;
+            vel.space   = ParticleSystemSimulationSpace.World;
+            vel.x = new ParticleSystem.MinMaxCurve(0f);
+            vel.y = new ParticleSystem.MinMaxCurve(-fallSpeed);
+            vel.z = new ParticleSystem.MinMaxCurve(0f);
+            var psr = go.GetComponent<ParticleSystemRenderer>();
+            psr.material = particleMat;
+            if (streaks)
+            {
+                psr.renderMode    = ParticleSystemRenderMode.Stretch;
+                psr.velocityScale = 0.04f;
+                psr.lengthScale   = 1f;
+            }
+            return ps;
+        }
+
+        var rainPS = MakePrecipitation("Rain", 28f, 0.5f, 0.05f, 2500f,
+            new Vector3(0f, 12f, 40f), new Vector3(30f, 1f, 110f), new Color(0.75f, 0.82f, 1f, 0.55f), true);
+        var snowPS = MakePrecipitation("Snow", 5f, 2.4f, 0.12f, 2500f,
+            new Vector3(0f, 11f, 110f), new Vector3(30f, 1f, 260f), new Color(1f, 1f, 1f, 0.9f), false);
 
         // ── 4. UI CANVAS ────────────────────────────────────────────────────
         var canvasGO = new GameObject("UI Canvas");
@@ -583,12 +657,67 @@ public class MasterAutomator
             return t;
         }
 
-        MakeFP("FP_Category", "QUARTER MILE",        0.72f, new Vector2(500f, 36f),  20, new Color(0.55f, 0.55f, 0.55f));
-        var fpTimeVal = MakeFP("FP_Time",    "0.00",  0.55f, new Vector2(400f, 110f), 96, Color.yellow);
-        MakeFP("FP_Suffix",   "SECONDS",             0.42f, new Vector2(400f, 34f),  22, new Color(0.65f, 0.65f, 0.65f));
-        var fpSpeed   = MakeFP("FP_Speed",   "TOP SPEED  —", 0.30f, new Vector2(500f, 36f), 24, new Color(0.85f, 0.85f, 0.85f));
-        MakeFP("FP_Restart",  "R  /  SPACE  •  RESTART", 0.18f, new Vector2(500f, 32f), 19, new Color(0.38f, 0.38f, 0.38f));
+        var fpResult  = MakeFP("FP_Result",  "YOU WIN", 0.86f, new Vector2(700f, 90f), 72, new Color(0.15f, 0.9f, 0.15f));
+        MakeFP("FP_Category", "QUARTER MILE",        0.74f, new Vector2(500f, 36f),  20, new Color(0.55f, 0.55f, 0.55f));
+        var fpTimeVal = MakeFP("FP_Time",    "0.00",  0.60f, new Vector2(400f, 110f), 96, Color.yellow);
+        MakeFP("FP_Suffix",   "SECONDS",             0.48f, new Vector2(400f, 34f),  22, new Color(0.65f, 0.65f, 0.65f));
+        var fpSpeed   = MakeFP("FP_Speed",   "TOP SPEED  —", 0.39f, new Vector2(500f, 36f), 24, new Color(0.85f, 0.85f, 0.85f));
+        var fpRival   = MakeFP("FP_Rival",   "RIVAL  —",     0.32f, new Vector2(500f, 36f), 24, new Color(1f, 0.55f, 0.1f));
+        var fpBest    = MakeFP("FP_Best",    "BEST  —",      0.25f, new Vector2(500f, 36f), 24, new Color(0.3f, 0.75f, 1f));
+        MakeFP("FP_Restart",  "R  /  SPACE  •  RESTART", 0.14f, new Vector2(500f, 32f), 19, new Color(0.38f, 0.38f, 0.38f));
         finishPanelGO.SetActive(false);
+
+        // ── Start Panel (pre-race menu)
+        var startPanelGO = new GameObject("Start Panel");
+        startPanelGO.transform.SetParent(canvasGO.transform, false);
+        var spRT = startPanelGO.AddComponent<RectTransform>();
+        spRT.anchorMin = Vector2.zero; spRT.anchorMax = Vector2.one;
+        spRT.sizeDelta = Vector2.zero; spRT.anchoredPosition = Vector2.zero;
+        startPanelGO.AddComponent<Image>().color = new Color(0.02f, 0.02f, 0.04f, 0.9f);
+
+        Text MakeSP(string name, string txt, float ay, Vector2 size, int fs, Color col)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(startPanelGO.transform, false);
+            var rt = go.AddComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, ay);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = size;
+            var t = go.AddComponent<Text>();
+            t.text = txt; t.font = font; t.fontSize = fs; t.color = col;
+            t.alignment = TextAnchor.MiddleCenter;
+            t.raycastTarget = false;
+            return t;
+        }
+
+        Button MakeSPButton(string name, string label, float ay, Vector2 size, int fs, Color bg, out Text labelText)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(startPanelGO.transform, false);
+            var rt = go.AddComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, ay);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = size;
+            go.AddComponent<Image>().color = bg;
+            var btn = go.AddComponent<Button>();
+            var lblGO = new GameObject("Label"); lblGO.transform.SetParent(go.transform, false);
+            var lblRT = lblGO.AddComponent<RectTransform>();
+            lblRT.anchorMin = Vector2.zero; lblRT.anchorMax = Vector2.one; lblRT.sizeDelta = Vector2.zero;
+            labelText = lblGO.AddComponent<Text>();
+            labelText.text = label; labelText.font = font; labelText.fontSize = fs; labelText.color = Color.white;
+            labelText.alignment = TextAnchor.MiddleCenter;
+            return btn;
+        }
+
+        var menuBtnBG = new Color(0.14f, 0.15f, 0.19f, 1f);
+        MakeSP("SP_Title",    "DRAG RACING",  0.82f, new Vector2(900f, 110f), 92, Color.white);
+        MakeSP("SP_Subtitle", "QUARTER MILE", 0.71f, new Vector2(600f, 36f),  24, accentOr);
+        var weatherBtn    = MakeSPButton("WeatherButton",    "WEATHER:  SUNNY", 0.57f, new Vector2(460f, 70f), 30, menuBtnBG, out Text weatherLbl);
+        var difficultyBtn = MakeSPButton("DifficultyButton", "RIVAL:  MEDIUM",  0.47f, new Vector2(460f, 70f), 30, menuBtnBG, out Text difficultyLbl);
+        var startBtn      = MakeSPButton("StartButton",      "START RACE",      0.33f, new Vector2(460f, 90f), 40, new Color(0.1f, 0.6f, 0.15f, 1f), out Text _);
+        MakeSP("SP_Hint", "W  WEATHER   •   D  RIVAL   •   ENTER  START", 0.22f, new Vector2(900f, 30f), 18, new Color(0.45f, 0.45f, 0.45f));
+        MakeSP("SP_Controls", "N  NITRO   •   B / SPACE  BRAKE", 0.17f, new Vector2(900f, 30f), 18, new Color(0.45f, 0.45f, 0.45f));
+        var menuBest = MakeSP("SP_Best", "", 0.09f, new Vector2(600f, 36f), 24, new Color(0.3f, 0.75f, 1f));
 
         // ── 5. MANAGERS ─────────────────────────────────────────────────────
         var gameManagerGO = new GameObject("Game Manager");
@@ -601,7 +730,21 @@ public class MasterAutomator
         gameManager.rpmBar    = rpmSlider;
         gameManager.autoRace  = autoRace;
 
-        weatherSystem.car = carPhysics;
+        weatherSystem.cars = new[] { carPhysics, aiPhysics };
+        weatherSystem.sun  = dirLight;
+        weatherSystem.cam  = camGO.GetComponent<Camera>();
+        weatherSystem.rain = rainPS;
+        weatherSystem.snow = snowPS;
+
+        gameManager.weatherSystem        = weatherSystem;
+        gameManager.startPanel           = startPanelGO;
+        gameManager.weatherChoiceText    = weatherLbl;
+        gameManager.difficultyChoiceText = difficultyLbl;
+        gameManager.menuBestText         = menuBest;
+        // Persistent listeners: plain AddListener calls made in the editor are not saved with the scene
+        UnityEventTools.AddPersistentListener(weatherBtn.onClick,    gameManager.CycleWeather);
+        UnityEventTools.AddPersistentListener(difficultyBtn.onClick, gameManager.CycleDifficulty);
+        UnityEventTools.AddPersistentListener(startBtn.onClick,      gameManager.BeginRace);
 
         var raceTimer = finishLine.AddComponent<RaceTimer>();
         raceTimer.timerText      = timerText;
@@ -616,9 +759,13 @@ public class MasterAutomator
         var aiOpponent = aiCar.AddComponent<AIOpponent>();
         aiOpponent.car       = aiPhysics;
         aiOpponent.raceTimer = raceTimer;
+        aiOpponent.finishZ   = finishLine.transform.position.z;
 
         gameManager.aiOpponent = aiOpponent;
         gameManager.rivalText  = rivalTxt;
+        gameManager.finishResultText = fpResult;
+        gameManager.finishRivalText  = fpRival;
+        gameManager.finishBestText   = fpBest;
 
         // ── 6. BUTTONS ──────────────────────────────────────────────────────
         Button MakeButton(string label, Vector2 pos)
@@ -641,12 +788,12 @@ public class MasterAutomator
         var launchBtn = MakeButton("Launch", new Vector2(-10f, 10f));
         var launchET  = launchBtn.gameObject.AddComponent<EventTrigger>();
         var downE = new EventTrigger.Entry { eventID = EventTriggerType.PointerDown };
-        downE.callback.AddListener((_) => gameManager.OnGasPedalDown()); launchET.triggers.Add(downE);
+        UnityEventTools.AddVoidPersistentListener(downE.callback, gameManager.OnGasPedalDown); launchET.triggers.Add(downE);
         var upE = new EventTrigger.Entry { eventID = EventTriggerType.PointerUp };
-        upE.callback.AddListener((_) => gameManager.OnGasPedalUp()); launchET.triggers.Add(upE);
+        UnityEventTools.AddVoidPersistentListener(upE.callback, gameManager.OnGasPedalUp); launchET.triggers.Add(upE);
 
-        MakeButton("Shift Up", new Vector2(-10f, 75f)).onClick.AddListener(carPhysics.ShiftUp);
-        MakeButton("Shift Down", new Vector2(-10f, 140f)).onClick.AddListener(carPhysics.ShiftDown);
+        UnityEventTools.AddPersistentListener(MakeButton("Shift Up", new Vector2(-10f, 75f)).onClick, carPhysics.ShiftUp);
+        UnityEventTools.AddPersistentListener(MakeButton("Shift Down", new Vector2(-10f, 140f)).onClick, carPhysics.ShiftDown);
 
         EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
         Debug.Log("[MasterAutomator] Scene built. Ctrl+S to save.");

@@ -7,7 +7,12 @@ using UnityEditor.SceneManagement;
 public class MasterAutomator
 {
     [MenuItem("Tools/Build Complete Drag Racing Game")]
-    public static void BuildScene()
+    public static void BuildScene() => BuildScene(autoRace: true);
+
+    [MenuItem("Tools/Build Complete Drag Racing Game (Manual Input)")]
+    public static void BuildSceneManual() => BuildScene(autoRace: false);
+
+    public static void BuildScene(bool autoRace)
     {
         // ── Idempotent cleanup ──────────────────────────────────────────────
         string[] rootNames = { "Drag Strip", "Player Car", "UI Canvas", "EventSystem", "Game Manager", "Directional Light" };
@@ -318,7 +323,10 @@ public class MasterAutomator
         var canvasGO = new GameObject("UI Canvas");
         var canvas   = canvasGO.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvasGO.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        var scaler = canvasGO.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode       = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight  = 0.5f;
         canvasGO.AddComponent<GraphicRaycaster>();
 
         var eventSystemGO = new GameObject("EventSystem");
@@ -463,7 +471,7 @@ public class MasterAutomator
         gameManager.speedText = speedText;
         gameManager.gearText  = gearText;
         gameManager.rpmBar    = rpmSlider;
-        gameManager.autoRace  = true;
+        gameManager.autoRace  = autoRace;
 
         weatherSystem.car = carPhysics;
 
@@ -507,9 +515,10 @@ public class MasterAutomator
         Debug.Log("[MasterAutomator] Scene built. Ctrl+S to save.");
     }
 
+    [MenuItem("Tools/Build And Save Drag Racing Game")]
     public static void BatchBuild()
     {
-        BuildScene();
+        BuildScene(autoRace: true);
         var scene = EditorSceneManager.GetActiveScene();
         EditorSceneManager.SaveScene(scene);
     }

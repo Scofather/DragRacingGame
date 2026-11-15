@@ -15,7 +15,7 @@ public class MasterAutomator
     public static void BuildScene(bool autoRace)
     {
         // ── Idempotent cleanup ──────────────────────────────────────────────
-        string[] rootNames = { "Drag Strip", "Player Car", "UI Canvas", "EventSystem", "Game Manager", "Directional Light" };
+        string[] rootNames = { "Drag Strip", "Player Car", "AI Car", "UI Canvas", "EventSystem", "Game Manager", "Directional Light" };
         foreach (string n in rootNames)
         {
             var ex = GameObject.Find(n);
@@ -183,6 +183,7 @@ public class MasterAutomator
 
         // ── 2. PLAYER CAR ───────────────────────────────────────────────────
         var playerCar = new GameObject("Player Car");
+        playerCar.tag = "Player";
         playerCar.transform.position = new Vector3(0f, 0f, 0f);
 
         var carCollider = playerCar.AddComponent<BoxCollider>();
@@ -335,6 +336,65 @@ public class MasterAutomator
         brakeSystem.car         = carPhysics;
         brakeSystem.brakeLights = brakeLightRenderers;
 
+        // ── 2b. AI OPPONENT CAR ─────────────────────────────────────────────
+        var aiCar = new GameObject("AI Car");
+        aiCar.transform.position = new Vector3(3.5f, 0f, 0f);
+
+        var aiCollider = aiCar.AddComponent<BoxCollider>();
+        aiCollider.center  = new Vector3(0f, 0.6f, 0f);
+        aiCollider.size    = new Vector3(1.8f, 1.4f, 4.0f);
+        aiCollider.isTrigger = true; // won't trigger the finish-line timer
+
+        var aiRb = aiCar.AddComponent<Rigidbody>();
+        aiRb.isKinematic = true;
+        aiRb.useGravity  = false;
+
+        var aiPhysics = aiCar.AddComponent<CarPhysics>();
+
+        var aiBodyMat = Mat(new Color(0.05f, 0.15f, 0.92f), 0.25f, 0.75f);
+
+        var aiBody = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        Object.DestroyImmediate(aiBody.GetComponent<Collider>());
+        aiBody.name = "Body";
+        aiBody.transform.SetParent(aiCar.transform, false);
+        aiBody.transform.localPosition = new Vector3(0f, 0.4f, 0f);
+        aiBody.transform.localScale    = new Vector3(2.0f, 0.55f, 4.5f);
+        aiBody.GetComponent<Renderer>().material = aiBodyMat;
+
+        var aiCabin = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        Object.DestroyImmediate(aiCabin.GetComponent<Collider>());
+        aiCabin.name = "Cabin";
+        aiCabin.transform.SetParent(aiCar.transform, false);
+        aiCabin.transform.localPosition = new Vector3(0f, 0.84f, -0.3f);
+        aiCabin.transform.localScale    = new Vector3(1.55f, 0.5f, 2.0f);
+        aiCabin.GetComponent<Renderer>().material = Mat(new Color(0.07f, 0.07f, 0.09f), 0.1f, 0.9f);
+
+        var aiWing = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        Object.DestroyImmediate(aiWing.GetComponent<Collider>());
+        aiWing.name = "RearWing";
+        aiWing.transform.SetParent(aiCar.transform, false);
+        aiWing.transform.localPosition = new Vector3(0f, 1.15f, -2.0f);
+        aiWing.transform.localScale    = new Vector3(2.3f, 0.09f, 0.55f);
+        aiWing.GetComponent<Renderer>().material = Mat(new Color(0.08f, 0.08f, 0.08f));
+
+        for (int i = 0; i < 4; i++)
+        {
+            var tire = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Object.DestroyImmediate(tire.GetComponent<Collider>());
+            tire.transform.SetParent(aiCar.transform, false);
+            tire.transform.localPosition     = wheelPos[i];
+            tire.transform.localEulerAngles  = new Vector3(0f, 0f, 90f);
+            tire.transform.localScale        = new Vector3(0.32f, 0.17f, 0.32f);
+            tire.GetComponent<Renderer>().material = wheelMat;
+
+            var rim = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Object.DestroyImmediate(rim.GetComponent<Collider>());
+            rim.transform.SetParent(tire.transform, false);
+            rim.transform.localPosition = Vector3.zero;
+            rim.transform.localScale    = new Vector3(0.62f, 1.05f, 0.62f);
+            rim.GetComponent<Renderer>().material = rimMat;
+        }
+
         // ── 3. CAMERA ───────────────────────────────────────────────────────
         var camGO = Camera.main != null ? Camera.main.gameObject : new GameObject("Main Camera");
         if (Camera.main == null) { camGO.AddComponent<Camera>(); camGO.tag = "MainCamera"; }
@@ -473,6 +533,20 @@ public class MasterAutomator
             new Vector2(0.5f, 0f), new Vector2(0f, 18f), new Vector2(250f, 48f),
             38, Color.yellow, TextAnchor.MiddleCenter);
 
+        // Rival status text (top-centre)
+        var rivalGO = new GameObject("Rival Text");
+        rivalGO.transform.SetParent(canvasGO.transform, false);
+        var rivalRT = rivalGO.AddComponent<RectTransform>();
+        rivalRT.anchorMin = rivalRT.anchorMax = rivalRT.pivot = new Vector2(0.5f, 1f);
+        rivalRT.anchoredPosition = new Vector2(0f, -18f);
+        rivalRT.sizeDelta        = new Vector2(320f, 40f);
+        var rivalTxt = rivalGO.AddComponent<Text>();
+        rivalTxt.text      = "RIVAL  +0m";
+        rivalTxt.font      = font;
+        rivalTxt.fontSize  = 22;
+        rivalTxt.color     = new Color(1f, 0.55f, 0.1f, 1f);
+        rivalTxt.alignment = TextAnchor.MiddleCenter;
+
         // ── Countdown Text (centre screen, managed by GameManager)
         var countdownGO = new GameObject("Countdown Text");
         countdownGO.transform.SetParent(canvasGO.transform, false);
@@ -538,6 +612,13 @@ public class MasterAutomator
         gameManager.finishSpeedText = fpSpeed;
         gameManager.nitroBoost      = nitroBoost;
         gameManager.nitroBar        = nitroSlider;
+
+        var aiOpponent = aiCar.AddComponent<AIOpponent>();
+        aiOpponent.car       = aiPhysics;
+        aiOpponent.raceTimer = raceTimer;
+
+        gameManager.aiOpponent = aiOpponent;
+        gameManager.rivalText  = rivalTxt;
 
         // ── 6. BUTTONS ──────────────────────────────────────────────────────
         Button MakeButton(string label, Vector2 pos)

@@ -10,6 +10,7 @@ public class RaceTimer : MonoBehaviour
     private bool isFinished = false;
 
     public bool IsFinished => isFinished;
+    public bool IsRacing   => isRacing;
     public float FinalTime  => raceTime;
 
     public void StartRace()

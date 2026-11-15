@@ -22,6 +22,10 @@ public class GameManager : MonoBehaviour
     public NitroBoost nitroBoost;
     public Slider nitroBar;
 
+    [Header("AI")]
+    public AIOpponent aiOpponent;
+    public Text rivalText;
+
     [Header("Auto Race (demo)")]
     public bool autoRace = false;
     public float autoRaceDelay = 3f;
@@ -104,6 +108,24 @@ public class GameManager : MonoBehaviour
 
         if (nitroBar != null && nitroBoost != null)
             nitroBar.value = nitroBoost.NitroLevel / 100f;
+
+        if (rivalText != null && aiOpponent != null && car != null)
+        {
+            if (raceTimer != null && raceTimer.IsFinished)
+            {
+                rivalText.gameObject.SetActive(false);
+            }
+            else
+            {
+                float delta = aiOpponent.transform.position.z - car.transform.position.z;
+                if (delta > 1f)
+                    rivalText.text = string.Format("RIVAL  +{0:F0}m", delta);
+                else if (delta < -1f)
+                    rivalText.text = string.Format("RIVAL  -{0:F0}m", Mathf.Abs(delta));
+                else
+                    rivalText.text = "NECK & NECK";
+            }
+        }
 
         if (!finishShown && raceTimer != null && raceTimer.IsFinished)
         {

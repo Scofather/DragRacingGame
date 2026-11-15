@@ -315,6 +315,26 @@ public class MasterAutomator
         var nitroBoost = playerCar.AddComponent<NitroBoost>();
         nitroBoost.car = carPhysics;
 
+        // Brake lights (two red boxes at rear)
+        var brakeLightMat = Mat(new Color(0.25f, 0f, 0f), 0f, 0.3f);
+        var brakeLightRenderers = new Renderer[2];
+        Vector3[] blPos = { new Vector3(-0.72f, 0.42f, -2.26f), new Vector3(0.72f, 0.42f, -2.26f) };
+        for (int i = 0; i < 2; i++)
+        {
+            var bl = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Object.DestroyImmediate(bl.GetComponent<Collider>());
+            bl.name = i == 0 ? "BrakeLightL" : "BrakeLightR";
+            bl.transform.SetParent(playerCar.transform, false);
+            bl.transform.localPosition = blPos[i];
+            bl.transform.localScale    = new Vector3(0.38f, 0.14f, 0.06f);
+            bl.GetComponent<Renderer>().material = brakeLightMat;
+            brakeLightRenderers[i] = bl.GetComponent<Renderer>();
+        }
+
+        var brakeSystem = playerCar.AddComponent<BrakeSystem>();
+        brakeSystem.car         = carPhysics;
+        brakeSystem.brakeLights = brakeLightRenderers;
+
         // ── 3. CAMERA ───────────────────────────────────────────────────────
         var camGO = Camera.main != null ? Camera.main.gameObject : new GameObject("Main Camera");
         if (Camera.main == null) { camGO.AddComponent<Camera>(); camGO.tag = "MainCamera"; }

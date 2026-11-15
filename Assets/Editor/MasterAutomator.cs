@@ -312,6 +312,9 @@ public class MasterAutomator
         }
         carPhysics.tireSmokeParticles = smokeSystems;
 
+        var nitroBoost = playerCar.AddComponent<NitroBoost>();
+        nitroBoost.car = carPhysics;
+
         // ── 3. CAMERA ───────────────────────────────────────────────────────
         var camGO = Camera.main != null ? Camera.main.gameObject : new GameObject("Main Camera");
         if (Camera.main == null) { camGO.AddComponent<Camera>(); camGO.tag = "MainCamera"; }
@@ -413,6 +416,37 @@ public class MasterAutomator
         fillRT.anchorMin = Vector2.zero; fillRT.anchorMax = Vector2.one; fillRT.sizeDelta = Vector2.zero;
         rpmSlider.fillRect = fillRT;
 
+        // Nitro bar panel (above RPM bar)
+        var nitroBlue = new Color(0.1f, 0.4f, 1.0f, 1f);
+        MakePanel("NitroBG", new Vector2(14f, 144f), new Vector2(292f, 32f), panelBG);
+        MakeText("NitroLabel", "NOS",
+            new Vector2(0f, 0f), new Vector2(16f, 152f), new Vector2(44f, 18f), 13, nitroBlue);
+
+        var nitroSliderGO = new GameObject("Nitro Bar");
+        nitroSliderGO.transform.SetParent(canvasGO.transform, false);
+        var nitroSliderRT = nitroSliderGO.AddComponent<RectTransform>();
+        nitroSliderRT.anchorMin = nitroSliderRT.anchorMax = nitroSliderRT.pivot = new Vector2(0f, 0f);
+        nitroSliderRT.anchoredPosition = new Vector2(62f, 147f);
+        nitroSliderRT.sizeDelta         = new Vector2(238f, 24f);
+        var nitroSlider = nitroSliderGO.AddComponent<Slider>();
+        nitroSlider.minValue = 0f; nitroSlider.maxValue = 1f; nitroSlider.value = 1f; nitroSlider.interactable = false;
+
+        var nitroBgGO = new GameObject("BG"); nitroBgGO.transform.SetParent(nitroSliderGO.transform, false);
+        var nitroBgImg = nitroBgGO.AddComponent<Image>(); nitroBgImg.color = new Color(0.15f, 0.15f, 0.15f, 1f);
+        var nitroBgRT = nitroBgGO.GetComponent<RectTransform>();
+        nitroBgRT.anchorMin = Vector2.zero; nitroBgRT.anchorMax = Vector2.one; nitroBgRT.sizeDelta = Vector2.zero;
+
+        var nitroFillAreaGO = new GameObject("Fill Area"); nitroFillAreaGO.transform.SetParent(nitroSliderGO.transform, false);
+        var nitroFillAreaRT = nitroFillAreaGO.AddComponent<RectTransform>();
+        nitroFillAreaRT.anchorMin = Vector2.zero; nitroFillAreaRT.anchorMax = Vector2.one;
+        nitroFillAreaRT.offsetMin = new Vector2(3f, 3f); nitroFillAreaRT.offsetMax = new Vector2(-3f, -3f);
+
+        var nitroFillGO = new GameObject("Fill"); nitroFillGO.transform.SetParent(nitroFillAreaGO.transform, false);
+        var nitroFillImg = nitroFillGO.AddComponent<Image>(); nitroFillImg.color = nitroBlue;
+        var nitroFillRT  = nitroFillGO.GetComponent<RectTransform>();
+        nitroFillRT.anchorMin = Vector2.zero; nitroFillRT.anchorMax = Vector2.one; nitroFillRT.sizeDelta = Vector2.zero;
+        nitroSlider.fillRect = nitroFillRT;
+
         // Timer panel (bottom-centre)
         MakePanel("TimerBG", new Vector2(0f, 14f), new Vector2(260f, 60f), panelBG, false);
         var timerText = MakeText("Timer Text", "Time: 0.00s",
@@ -482,6 +516,8 @@ public class MasterAutomator
         gameManager.finishPanel     = finishPanelGO;
         gameManager.finishTimeText  = fpTimeVal;
         gameManager.finishSpeedText = fpSpeed;
+        gameManager.nitroBoost      = nitroBoost;
+        gameManager.nitroBar        = nitroSlider;
 
         // ── 6. BUTTONS ──────────────────────────────────────────────────────
         Button MakeButton(string label, Vector2 pos)

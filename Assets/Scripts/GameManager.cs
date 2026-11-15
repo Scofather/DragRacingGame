@@ -18,6 +18,10 @@ public class GameManager : MonoBehaviour
     public Text finishTimeText;
     public Text finishSpeedText;
 
+    [Header("Nitro")]
+    public NitroBoost nitroBoost;
+    public Slider nitroBar;
+
     [Header("Auto Race (demo)")]
     public bool autoRace = false;
     public float autoRaceDelay = 3f;
@@ -97,6 +101,9 @@ public class GameManager : MonoBehaviour
 
         if (rpmBar != null && car != null)
             rpmBar.value = car.currentRPM / car.maxRPM;
+
+        if (nitroBar != null && nitroBoost != null)
+            nitroBar.value = nitroBoost.NitroLevel / 100f;
 
         if (!finishShown && raceTimer != null && raceTimer.IsFinished)
         {

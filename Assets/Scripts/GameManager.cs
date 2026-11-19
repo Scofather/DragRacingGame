@@ -235,8 +235,10 @@ public class GameManager : MonoBehaviour
         {
             finishShown = true;
 
+            // The rival crossing first is a loss; a lost run is not saved as a best time.
+            bool  lost    = aiOpponent != null && aiOpponent.HasFinished;
             float best    = PlayerPrefs.GetFloat(BestTimeKey, 0f);
-            bool  newBest = best <= 0f || raceTimer.FinalTime < best;
+            bool  newBest = !lost && (best <= 0f || raceTimer.FinalTime < best);
             if (newBest)
             {
                 PlayerPrefs.SetFloat(BestTimeKey, raceTimer.FinalTime);
@@ -261,7 +263,7 @@ public class GameManager : MonoBehaviour
                     }
                     else
                     {
-                        bool won = !aiOpponent.HasFinished;
+                        bool won = !lost;
                         finishResultText.text  = won ? "YOU WIN" : "YOU LOSE";
                         finishResultText.color = won ? new Color(0.15f, 0.9f, 0.15f) : new Color(1f, 0.25f, 0.2f);
                     }

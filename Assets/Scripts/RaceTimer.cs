@@ -4,6 +4,8 @@ using UnityEngine.UI;
 public class RaceTimer : MonoBehaviour
 {
     public Text timerText;
+    [Tooltip("The player's car. Only this car stops the clock; leave empty to accept any non-AI car.")]
+    public CarPhysics playerCar;
 
     private float raceTime = 0f;
     private bool isRacing = false;
@@ -33,7 +35,10 @@ public class RaceTimer : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         if (isFinished) return;
-        if (other.GetComponent<CarPhysics>() == null) return;
+        CarPhysics crossing = other.GetComponentInParent<CarPhysics>();
+        if (crossing == null) return;
+        // The rival's trigger collider also fires OnTriggerEnter; it must not end the player's race.
+        if (playerCar != null ? crossing != playerCar : crossing.GetComponent<AIOpponent>() != null) return;
 
         isRacing = false;
         isFinished = true;

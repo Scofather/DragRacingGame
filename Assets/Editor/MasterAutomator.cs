@@ -360,7 +360,7 @@ public class MasterAutomator
         var aiCollider = aiCar.AddComponent<BoxCollider>();
         aiCollider.center  = new Vector3(0f, 0.6f, 0f);
         aiCollider.size    = new Vector3(1.8f, 1.4f, 4.0f);
-        aiCollider.isTrigger = true; // won't trigger the finish-line timer
+        aiCollider.isTrigger = true; // RaceTimer ignores it: only raceTimer.playerCar stops the clock
 
         var aiRb = aiCar.AddComponent<Rigidbody>();
         aiRb.isKinematic = true;
@@ -748,6 +748,7 @@ public class MasterAutomator
 
         var raceTimer = finishLine.AddComponent<RaceTimer>();
         raceTimer.timerText      = timerText;
+        raceTimer.playerCar      = carPhysics;
         gameManager.raceTimer    = raceTimer;
         gameManager.countdownText   = countdownTxt;
         gameManager.finishPanel     = finishPanelGO;
